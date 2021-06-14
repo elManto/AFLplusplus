@@ -431,12 +431,16 @@ static void edit_params(u32 argc, char **argv, char **envp) {
     cc_params[cc_par_cnt++] = "-Wno-unused-command-line-argument";
 
     // setup the data dependency stuff
-    char* ddg_path = "../DD";
+    //char* ddg_path = alloc_printf(obj_path, "../../DD");
+    //
+    //u8 *afl_path = getenv("AFL_PATH");
+    //printf("AFL PATH is %s\n\n", afl_path);
+    
     cc_params[cc_par_cnt++] = "-Xclang";
     cc_params[cc_par_cnt++] = "-load";
     cc_params[cc_par_cnt++] = "-Xclang";
     cc_params[cc_par_cnt++] =
-          alloc_printf("%s/ddg_instr.so", ddg_path);
+          alloc_printf("%s/ddg_instr.so", obj_path);
 
 
     if (lto_mode && have_instr_env) {
@@ -2087,4 +2091,3 @@ int main(int argc, char **argv, char **envp) {
   return 0;
 
 }
-

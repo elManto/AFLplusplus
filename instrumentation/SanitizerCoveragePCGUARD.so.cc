@@ -431,7 +431,9 @@ bool ModuleSanitizerCoverage::instrumentModule(
   Int1Ty = IRB.getInt1Ty();
   LLVMContext &Ctx = M.getContext();
 
-  AFLMapPtr =
+  AFLMapPtr = M.getGlobalVariable("__afl_area_ptr");
+  if (!AFLMapPtr)
+    AFLMapPtr =
       new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                          GlobalValue::ExternalLinkage, 0, "__afl_area_ptr");
   One = ConstantInt::get(IntegerType::getInt8Ty(Ctx), 1);

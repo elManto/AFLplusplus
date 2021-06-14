@@ -321,8 +321,9 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   /* Get globals for the SHM region and the previous location. Note that
      __afl_prev_loc is thread-local. */
-
-  GlobalVariable *AFLMapPtr =
+  GlobalVariable* AFLMapPtr = M.getGlobalVariable("__afl_area_ptr");
+  if (AFLMapPtr == nullptr)
+    AFLMapPtr =
       new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                          GlobalValue::ExternalLinkage, 0, "__afl_area_ptr");
   GlobalVariable *AFLPrevLoc;
