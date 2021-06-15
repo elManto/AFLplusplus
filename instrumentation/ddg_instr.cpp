@@ -313,6 +313,11 @@ public:
 						Value* Variable = static_cast<Value*>(AI);
             CreateDataFlow(Variable);
           }
+
+          if (auto LI = dyn_cast<LoadInst>(&I)) {
+            Value* Variable = LI->getPointerOperand();
+            CreateDataFlow(Variable);
+          }
           
           if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) { // We dedicate an list for GEPs defined llvm vars.
             Value* Var = static_cast<Value*>(&I);           // For other LLVM variables, we use the DataflowTracker
