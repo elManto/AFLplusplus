@@ -89,13 +89,13 @@
 #define MAX_DEPTH 3
 #define MIN_FCN_SIZE 1
 #define VAR_NAME_LEN 264
-#define MAP_SIZE 65536
-//#define MAP_SIZE 127
+//#define MAP_SIZE 65535
+#define MAP_SIZE 255
 //#define INTERPROCEDURAL 1   	// unset if you want only intraprocedural ret values management BUT
 				// in some cases it makes llvm segfault because of a conflict with live 
 				// variable analysis
 
-//#define NDEBUG 1        // unset if you want debug prints enabled
+#define NDEBUG 1        // unset if you want debug prints enabled
 #define AFL_R(x) (random() % (x))
 
 #ifndef NDEBUG
@@ -246,15 +246,16 @@ public:
 
     LLVMContext &C = M.getContext();
     IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
+    IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
     //IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
-    ConstantInt *Zero = ConstantInt::get(Int16Ty, 0);
-    ConstantInt *One = ConstantInt::get(Int16Ty, 1);
+    ConstantInt *Zero = ConstantInt::get(Int8Ty, 0);
+    ConstantInt *One = ConstantInt::get(Int8Ty, 1);
     unsigned int instrumentedLocations = 0;
 
     std::map<BasicBlock*, ConstantInt*> BlocksLocs;
     std::map<BasicBlock*, Value*> VisitedBlocks;
-    ConstantInt *Visited = ConstantInt::get(Int16Ty, 65535);
-    ConstantInt *NonVisited = ConstantInt::get(Int16Ty, 0);
+    ConstantInt *Visited = ConstantInt::get(Int8Ty, 255);
+    ConstantInt *NonVisited = ConstantInt::get(Int8Ty, 0);
     ConstantInt* CurLoc;
     char* name = nullptr;
     unsigned BBCounter = 0;
@@ -266,7 +267,7 @@ public:
 
     GlobalVariable* AFLMapPtr = M.getGlobalVariable("__afl_area_ptr");
     if (AFLMapPtr == nullptr)
-      AFLMapPtr = new GlobalVariable(M, PointerType::get(Int16Ty, 0), false,
+      AFLMapPtr = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
         GlobalValue::ExternalLinkage, 0, "__afl_area_ptr");
 
 #ifdef INTERPROCEDURAL
@@ -518,9 +519,9 @@ public:
         name = new char[VAR_NAME_LEN];
         memset(name, 0, VAR_NAME_LEN);
         snprintf(name, VAR_NAME_LEN, "my_var_%d", BBCounter++);
-        AllocaInst* AllocaIsCurrentlyBlockVisited = IRB.CreateAlloca(Int16Ty, nullptr, StringRef(name));
-	AllocaIsCurrentlyBlockVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-	IsCurrentBlockVisited = static_cast<Value*>(AllocaIsCurrentlyBlockVisited);
+        AllocaInst* AllocaIsCurrentlyBlockVisited = IRB.CreateAlloca(Int8Ty, nullptr, StringRef(name));
+				AllocaIsCurrentlyBlockVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+				IsCurrentBlockVisited = static_cast<Value*>(AllocaIsCurrentlyBlockVisited);
         if (&EntryBB == &BB) 
           IRB.CreateStore(Visited, IsCurrentBlockVisited);
         else
@@ -528,7 +529,7 @@ public:
         VisitedBlocks[&BB] = IsCurrentBlockVisited;
 
         cur_loc = AFL_R(map_size);
-        CurLoc = ConstantInt::get(Int16Ty, cur_loc);      
+        CurLoc = ConstantInt::get(Int8Ty, cur_loc);      
         BlocksLocs[&BB] = CurLoc;
       }
 
@@ -568,7 +569,7 @@ public:
 
         Value *Incr = IRB.CreateAdd(Counter, One);
         auto cf = IRB.CreateICmpEQ(Incr, Zero);
-        auto carry = IRB.CreateZExt(cf, Int16Ty);
+        auto carry = IRB.CreateZExt(cf, Int8Ty);
         Incr = IRB.CreateAdd(Incr, carry);
 
         StoreInst* StoreMapPtr = IRB.CreateStore(Incr, MapPtrIdx);
@@ -579,7 +580,8 @@ public:
 
 
 		}			
-  errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
+  DEBUG(errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n");
+	errs() << "DDG - Instrumentation worked!\n";
 	return true;
   }
   
