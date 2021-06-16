@@ -89,13 +89,13 @@
 #define MAX_DEPTH 3
 #define MIN_FCN_SIZE 1
 #define VAR_NAME_LEN 264
-#define MAP_SIZE 65536
-//#define MAP_SIZE 127
+//#define MAP_SIZE 65536
+#define MAP_SIZE 127
 //#define INTERPROCEDURAL 1   	// unset if you want only intraprocedural ret values management BUT
 				// in some cases it makes llvm segfault because of a conflict with live 
 				// variable analysis
 
-#define NDEBUG 1        // unset if you want debug prints enabled
+//#define NDEBUG 1        // unset if you want debug prints enabled
 #define AFL_R(x) (random() % (x))
 
 #ifndef NDEBUG
@@ -237,10 +237,7 @@ public:
   }
 
 	bool doInitialization(Module &M) override {
-
 		//LLVMContext* C = &(M.getContext());
-		//this->VoidTy = Type::getVoidTy(*C);
-		//this->logger = M.getOrInsertFunction("__log_ddg_node", VoidTy);
 		return true;
 	}
 
@@ -294,6 +291,15 @@ public:
 
 		for (auto &F : M) {
 			if (F.size() < MIN_FCN_SIZE) continue;
+
+      // First we add the function params to track the dataflow
+      for (Function::arg_iterator arg_it = F.arg_begin(); arg_it != F.arg_end(); arg_it++) {
+        Argument* Arg = arg_it;
+        if (Value* ArgVariable = dyn_cast<Value>(Arg)) {
+          CreateDataFlow(ArgVariable);
+          DEBUG(errs() << "Adding Argument to DataFlowTraker " << ArgVariable->getName() << "\n");
+        }
+      }
 
       LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(F).getLoopInfo();
       DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
