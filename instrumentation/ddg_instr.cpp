@@ -89,9 +89,11 @@
 #define MAX_DEPTH 3
 #define MIN_FCN_SIZE 1
 #define VAR_NAME_LEN 264
-//#define MAP_SIZE 65536
-#define MAP_SIZE 127
-#define INTERPROCEDURAL 1 // unset if you want only intraprocedural
+#define MAP_SIZE 65536
+//#define MAP_SIZE 127
+//#define INTERPROCEDURAL 1   	// unset if you want only intraprocedural ret values management BUT
+				// in some cases it makes llvm segfault because of a conflict with live 
+				// variable analysis
 
 #define NDEBUG 1        // unset if you want debug prints enabled
 #define AFL_R(x) (random() % (x))
@@ -511,7 +513,9 @@ public:
         name = new char[VAR_NAME_LEN];
         memset(name, 0, VAR_NAME_LEN);
         snprintf(name, VAR_NAME_LEN, "my_var_%d", BBCounter++);
-        IsCurrentBlockVisited = IRB.CreateAlloca(Int8Ty, nullptr, StringRef(name));
+        AllocaInst* AllocaIsCurrentlyBlockVisited = IRB.CreateAlloca(Int8Ty, nullptr, StringRef(name));
+	AllocaIsCurrentlyBlockVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+	IsCurrentBlockVisited = static_cast<Value*>(AllocaIsCurrentlyBlockVisited);
         if (&EntryBB == &BB) 
           IRB.CreateStore(Visited, IsCurrentBlockVisited);
         else
