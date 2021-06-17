@@ -16,7 +16,6 @@
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/CFG.h"
-#include "llvm/Analysis/DDG.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Attributes.h"
@@ -85,12 +84,15 @@
 #include <fstream>
 
 #include "ddg_utils.h"
+#include "config.h"
 
 #define MAX_DEPTH 3
 #define MIN_FCN_SIZE 1
 #define VAR_NAME_LEN 264
-//#define MAP_SIZE 65535
-#define MAP_SIZE 255
+
+//#define MAP_SIZE 65536
+#define ALL_BIT_SET (MAP_SIZE - 1)
+//#define MAP_SIZE 255
 //#define INTERPROCEDURAL 1   	// unset if you want only intraprocedural ret values management BUT
 				// in some cases it makes llvm segfault because of a conflict with live 
 				// variable analysis
@@ -247,7 +249,7 @@ public:
     LLVMContext &C = M.getContext();
     IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
     IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
-    //IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
+    IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
     ConstantInt *Zero = ConstantInt::get(Int8Ty, 0);
     ConstantInt *One = ConstantInt::get(Int8Ty, 1);
     unsigned int instrumentedLocations = 0;
@@ -291,13 +293,24 @@ public:
 #endif
 
 		for (auto &F : M) {
+
 			if (F.size() < MIN_FCN_SIZE) continue;
+
+      std::map<Value*, std::vector<FlowWriteInstruction*>> Stores;      // Represents the nodes of our DataDep Graph
+      std::vector<std::tuple<BasicBlock*, BasicBlock*>> StoreEdges;     // Contains the edges of the DDG
+      std::map<BasicBlock*, std::set<BasicBlock*>> IncomingEdges;    // Map s.t. key is a BB and value is a set of BBs whose data flow reaches the key
+      std::map<Value*, Instruction*> LLVMVariables;                     // LLVM IR Variables which are used as Operands for the store (for instance, the ones resulting from a GEP)
+
+      BasicBlock& EntryBB = F.getEntryBlock();
+			Instruction* FirstInst = EntryBB.getFirstNonPHIOrDbg();
 
       // First we add the function params to track the dataflow
       for (Function::arg_iterator arg_it = F.arg_begin(); arg_it != F.arg_end(); arg_it++) {
         Argument* Arg = arg_it;
         if (Value* ArgVariable = dyn_cast<Value>(Arg)) {
           CreateDataFlow(ArgVariable);
+					FlowWriteInstruction* MyStore = new FlowWriteInstruction(&EntryBB, FirstInst, modification);
+					Stores[ArgVariable].push_back(MyStore);
         }
       }
 
@@ -306,11 +319,6 @@ public:
   
 			// We basically want to track data flow between memory instructions 
 			// and call instructions (i.e., the arguments)
-
-      std::map<Value*, std::vector<FlowWriteInstruction*>> Stores;      // Represents the nodes of our DataDep Graph
-      std::vector<std::tuple<BasicBlock*, BasicBlock*>> StoreEdges;     // Contains the edges of the DDG
-      std::map<BasicBlock*, std::set<BasicBlock*>> IncomingEdges;    // Map s.t. key is a BB and value is a set of BBs whose data flow reaches the key
-      std::map<Value*, Instruction*> LLVMVariables;                     // LLVM IR Variables which are used as Operands for the store (for instance, the ones resulting from a GEP)
 
       // Here we extract the data dependence info for function F
       for (auto &BB : F) {
@@ -426,6 +434,7 @@ public:
             FlowWriteInstruction* MyStore = nullptr;
             Value* Variable = nullptr;
 						Function* FC = Call->getCalledFunction();
+						//DEBUG(errs() << "Looking for dependencies when calling " << FC->getName() << "\n");
             int argStart = 0;         // In some cases, we dont want to track dependencies for each argument.
                                       // For instance, for memcpy(src, dst, n), we can ignore previous `src`
                                       // dependencies, since it is being written. Rather, for this specific 
@@ -475,7 +484,7 @@ public:
 
 								for (std::vector<Value*>::iterator it = Flows.begin(); it != Flows.end(); ++it) {
 									Value* Dependency = *it;
-									//errs() << "Call depending on: {" << Dependency->getName() << "}\n";
+									//DEBUG(errs() << "Call depending on: {" << Dependency->getName() << "}\n");
                   std::vector<FlowWriteInstruction*> AllStoresPerVariable = Stores[Dependency];
                   unsigned ConsideredStores = 0;
                   bool* ReachingStores = isReachableByStore(&AllStoresPerVariable, Call, &DT, &LI, &ConsideredStores);
@@ -510,7 +519,6 @@ public:
       }      
 
       // Instrument the locations in the function
-      BasicBlock& EntryBB = F.getEntryBlock();
       BasicBlock::iterator IP = EntryBB.getFirstInsertionPt();
       IRBuilder<> IRB(&(*IP));
       Value* IsCurrentBlockVisited;
@@ -528,6 +536,7 @@ public:
           IRB.CreateStore(NonVisited, IsCurrentBlockVisited);
         VisitedBlocks[&BB] = IsCurrentBlockVisited;
 
+				//errs() << "MAP SIZE " << std::to_string(map_size) << "\n";
         cur_loc = AFL_R(map_size);
         CurLoc = ConstantInt::get(Int8Ty, cur_loc);      
         BlocksLocs[&BB] = CurLoc;
@@ -556,9 +565,13 @@ public:
           else
             HashedLoc = IRB.CreateXor(HashedLoc, PrevLocIfVisited);
 
+        	instrumentedLocations++;
+
         }
         if (HashedLoc == nullptr)
           continue;
+
+				HashedLoc = IRB.CreateZExt(HashedLoc, IRB.getInt16Ty());
 
         LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
@@ -575,13 +588,12 @@ public:
         StoreInst* StoreMapPtr = IRB.CreateStore(Incr, MapPtrIdx);
         StoreMapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
   
-        instrumentedLocations++;
+
       }
 
 
 		}			
-  DEBUG(errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n");
-	errs() << "DDG - Instrumentation worked!\n";
+  errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
 	return true;
   }
   

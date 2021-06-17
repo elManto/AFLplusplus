@@ -72,11 +72,16 @@
    is used for instrumentation output before __afl_map_shm() has a chance to
    run. It will end up as .comm, so it shouldn't be too wasteful. */
 
+//#ifndef MAP_SIZE
+//  #define MAP_SIZE 65536
+//#endif
+
 #if MAP_SIZE <= 65536
   #define MAP_INITIAL_SIZE 2097152
 #else
   #define MAP_INITIAL_SIZE MAP_SIZE
 #endif
+//#define MAP_INITIAL_SIZE MAP_SIZE
 
 #if defined(__HAIKU__)
 extern ssize_t _kern_write(int fd, off_t pos, const void *buffer,

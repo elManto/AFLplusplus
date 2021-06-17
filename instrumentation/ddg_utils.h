@@ -16,7 +16,6 @@
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/CFG.h"
-#include "llvm/Analysis/DDG.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Attributes.h"
