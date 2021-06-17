@@ -309,7 +309,7 @@ public:
         Argument* Arg = arg_it;
         if (Value* ArgVariable = dyn_cast<Value>(Arg)) {
           CreateDataFlow(ArgVariable);
-					FlowWriteInstruction* MyStore = new FlowWriteInstruction(&EntryBB, FirstInst, modification);
+					FlowWriteInstruction* MyStore = new FlowWriteInstruction(&EntryBB, FirstInst, declaration);
 					Stores[ArgVariable].push_back(MyStore);
         }
       }
@@ -330,9 +330,59 @@ public:
             CreateDataFlow(Variable);
           }
 
-          if (auto LI = dyn_cast<LoadInst>(&I)) {
-            Value* Variable = LI->getPointerOperand();
+          if (auto LOI = dyn_cast<LoadInst>(&I)) {
+            Value* Variable = LOI->getPointerOperand();
             CreateDataFlow(Variable);
+           
+						std::vector<Value*> Flows;
+						RetrieveDataFlow(Variable, &Flows);
+            
+          	// If `Variable` does not directly represent a Src code variable, we fetch what it represents (e.g., the field of a struct)
+            if (! isSourceCodeVariable(Variable)) {
+              Value* ActualSrcVariable = nullptr;
+              RetrieveAccessedVariable(Variable, &Flows, &LLVMVariables, &ActualSrcVariable);
+              if(ActualSrcVariable)
+              	Variable = ActualSrcVariable;
+            }
+
+
+						for (std::vector<Value*>::iterator it = Flows.begin(); it != Flows.end(); ++it) {
+							Value* Dependency = *it;
+
+              // First we find the edges between the current store and the previous ones
+              // (i.e., when we wrote into `c` and `b` if the current store is `a = c + b`)
+              std::vector<FlowWriteInstruction*> AllStoresPerVariable = Stores[Dependency];
+              unsigned ConsideredStores = 0;
+              bool* ReachingStores = isReachableByStore(&AllStoresPerVariable, LOI, &DT, &LI, &ConsideredStores);
+
+              // ReachingStores[0] refers to the last Store instruction that we met (i.e., the last in `AllStoresPerVariable` 
+              // This is why we iterate the vector in a reverse way BUT the array in the forward
+              unsigned i = 0;
+              for ( std::vector<FlowWriteInstruction*>::reverse_iterator it = AllStoresPerVariable.rbegin(); it != AllStoresPerVariable.rend(); it++) {
+                if (ReachingStores[i] && (i < ConsideredStores)) {
+                  Instruction* Src = (*it)->I;
+                  if (Src == LOI) // Already managed in the `reachableByStores` method
+                    continue; 
+                  if (Src->getParent() != LOI->getParent()) {
+                    std::tuple<BasicBlock*, BasicBlock*> edge = {Src->getParent(), LOI->getParent()};
+                    StoreEdges.push_back(edge);
+                    IncomingEdges[LOI->getParent()].insert(LOI->getParent());
+                    DEBUG(errs() << "+++++++++++\nAdding edge\n");
+                    DEBUG(debug_instruction(Src));
+                    DEBUG(debug_instruction(LOI));
+                    DEBUG(errs() << "-----------\n");
+                  }
+                }
+                i++;
+              }
+
+              delete[] ReachingStores;
+                           
+						}
+            // Then we insert the new Store in our map that contains all the stores, so we build forward deps
+            FlowWriteInstruction* MyStore = new FlowWriteInstruction(LOI->getParent(), LOI, declaration);
+            Stores[Variable].push_back(MyStore);
+
           }
           
           if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) { // We dedicate an list for GEPs defined llvm vars.
