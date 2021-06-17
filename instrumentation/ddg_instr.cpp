@@ -615,8 +615,6 @@ public:
           else
             HashedLoc = IRB.CreateXor(HashedLoc, PrevLocIfVisited);
 
-        	instrumentedLocations++;
-
         }
         if (HashedLoc == nullptr)
           continue;
@@ -638,6 +636,8 @@ public:
         StoreInst* StoreMapPtr = IRB.CreateStore(Incr, MapPtrIdx);
         StoreMapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
   
+
+        instrumentedLocations++;
 
       }
 
