@@ -93,14 +93,15 @@
 //#define MAP_SIZE 65536
 #define ALL_BIT_SET (MAP_SIZE - 1)
 //#define MAP_SIZE 255
-//#define INTERPROCEDURAL 1   	// unset if you want only intraprocedural ret values management BUT
-				// in some cases it makes llvm segfault because of a conflict with live 
-				// variable analysis
 
-#define NDEBUG 1        // unset if you want debug prints enabled
+//#define INTERPROCEDURAL 1   	// unset if you want only intraprocedural ret values management BUT
+//#define  LOAD_INSTR           // considers loads as stores
+
+//#define DEBUG 1               // set if you want debug prints enabled
+
 #define AFL_R(x) (random() % (x))
 
-#ifndef NDEBUG
+#ifdef DEBUG
 #define DEBUG(X)                                                               \
   do {                                                                         \
     X;                                                                         \
@@ -333,7 +334,7 @@ public:
           if (auto LOI = dyn_cast<LoadInst>(&I)) {
             Value* Variable = LOI->getPointerOperand();
             CreateDataFlow(Variable);
-           
+#ifdef LOAD_INSTR 
 						std::vector<Value*> Flows;
 						RetrieveDataFlow(Variable, &Flows);
             
@@ -382,7 +383,7 @@ public:
             // Then we insert the new Store in our map that contains all the stores, so we build forward deps
             FlowWriteInstruction* MyStore = new FlowWriteInstruction(LOI->getParent(), LOI, declaration);
             Stores[Variable].push_back(MyStore);
-
+#endif
           }
           
           if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) { // We dedicate an list for GEPs defined llvm vars.
