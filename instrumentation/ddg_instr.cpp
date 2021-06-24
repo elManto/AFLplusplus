@@ -82,6 +82,10 @@
 #include <map>
 #include <tuple>
 #include <fstream>
+#include <sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "ddg_utils.h"
 #include "config.h"
@@ -99,6 +103,8 @@
 
 //#define DEBUG 1               // set if you want debug prints enabled
 
+
+#define AFL_SR(s) (srandom(s))
 #define AFL_R(x) (random() % (x))
 
 #ifdef DEBUG
@@ -257,15 +263,24 @@ public:
 
     std::map<BasicBlock*, ConstantInt*> BlocksLocs;
     std::map<BasicBlock*, Value*> VisitedBlocks;
-    ConstantInt *Visited = ConstantInt::get(Int8Ty, 255);
-    ConstantInt *NonVisited = ConstantInt::get(Int8Ty, 0);
+    ConstantInt *Visited = ConstantInt::get(Int16Ty, 0xff);
+    ConstantInt *NonVisited = ConstantInt::get(Int16Ty, 0);
     ConstantInt* CurLoc;
     char* name = nullptr;
     unsigned BBCounter = 0;
-    unsigned int cur_loc;
+    unsigned int cur_loc = 0;
     uint32_t map_size = MAP_SIZE;
 
 
+		struct timeval  tv;
+  	struct timezone tz;
+	  unsigned int    rand_seed;
+
+
+		/* Setup random() so we get Actually Random(TM) outputs from AFL_R() */
+		gettimeofday(&tv, &tz);
+		rand_seed = tv.tv_sec ^ tv.tv_usec ^ getpid();
+		AFL_SR(rand_seed);
 
 
     GlobalVariable* AFLMapPtr = M.getGlobalVariable("__afl_area_ptr");
@@ -578,18 +593,23 @@ public:
         name = new char[VAR_NAME_LEN];
         memset(name, 0, VAR_NAME_LEN);
         snprintf(name, VAR_NAME_LEN, "my_var_%d", BBCounter++);
-        AllocaInst* AllocaIsCurrentlyBlockVisited = IRB.CreateAlloca(Int8Ty, nullptr, StringRef(name));
+        AllocaInst* AllocaIsCurrentlyBlockVisited = IRB.CreateAlloca(Int16Ty, nullptr, StringRef(name));
 				AllocaIsCurrentlyBlockVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 				IsCurrentBlockVisited = static_cast<Value*>(AllocaIsCurrentlyBlockVisited);
+				StoreInst* InitializeVisited;
         if (&EntryBB == &BB) 
-          IRB.CreateStore(Visited, IsCurrentBlockVisited);
+          InitializeVisited = IRB.CreateStore(Visited, IsCurrentBlockVisited);
         else
-          IRB.CreateStore(NonVisited, IsCurrentBlockVisited);
+          InitializeVisited = IRB.CreateStore(NonVisited, IsCurrentBlockVisited);
+				
+				if (InitializeVisited)
+        	InitializeVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
         VisitedBlocks[&BB] = IsCurrentBlockVisited;
 
 				//errs() << "MAP SIZE " << std::to_string(map_size) << "\n";
         cur_loc = AFL_R(map_size);
-        CurLoc = ConstantInt::get(Int8Ty, cur_loc);      
+        CurLoc = ConstantInt::get(Int16Ty, cur_loc);      
         BlocksLocs[&BB] = CurLoc;
       }
 
@@ -600,7 +620,9 @@ public:
         IP = BB.getFirstInsertionPt();
         IRBuilder<> IRB(&(*IP));
         IsCurrentBlockVisited = VisitedBlocks[&BB];
-        IRB.CreateStore(Visited, IsCurrentBlockVisited);
+
+        StoreInst* StoreIsVisited = IRB.CreateStore(Visited, IsCurrentBlockVisited);
+        StoreIsVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
         Value* HashedLoc = nullptr;
 
@@ -609,7 +631,10 @@ public:
           ConstantInt* PotentiallyPreviousLoc = BlocksLocs[*it];
           if (!isVisited or !PotentiallyPreviousLoc)
             continue;
-          Value* PrevLocIfVisited = IRB.CreateAnd(IRB.CreateLoad(isVisited), PotentiallyPreviousLoc);
+					LoadInst* LoadIsVisited = IRB.CreateLoad(isVisited);
+        	LoadIsVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
+          Value* PrevLocIfVisited = IRB.CreateAnd(LoadIsVisited, PotentiallyPreviousLoc);
           CurLoc = BlocksLocs[&BB];
           if (HashedLoc == nullptr)
             HashedLoc = IRB.CreateXor(CurLoc, PrevLocIfVisited);
@@ -620,7 +645,7 @@ public:
         if (HashedLoc == nullptr)
           continue;
 
-				HashedLoc = IRB.CreateZExt(HashedLoc, IRB.getInt16Ty());
+				HashedLoc = IRB.CreateZExt(HashedLoc, IRB.getInt32Ty());
 
         LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
