@@ -669,7 +669,8 @@ public:
 
 
 		}			
-  errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
+	
+  //errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
 	return true;
   }
   
