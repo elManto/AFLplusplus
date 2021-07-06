@@ -187,7 +187,7 @@ private:
         *ActualSrcVariable = PtrOperand;
         if (isSourceCodeVariable(PtrOperand)) {
           // We finally could connect an LLVM variable to an actual Source code Variable!
-          for (int i = 1; i < DefiningInstruction->getNumOperands(); i++) { // Starts from 1, since 0 is thr PtrOperand
+          for (unsigned int i = 1; i < DefiningInstruction->getNumOperands(); i++) { // Starts from 1, since 0 is thr PtrOperand
 	   	      Value* Op = DefiningInstruction->getOperand(i);
 	   		    if (! isa<Constant>(Op)) {
 	   		      RetrieveDataFlow(Op, Flows);
@@ -199,7 +199,7 @@ private:
           // Re-itereate the Variable analysis
           RetrieveAccessedVariable(Variable, Flows, LLVMVariables, ActualSrcVariable);           
         }
-        for (int i = 1; i < DefiningInstruction->getNumOperands(); i++) { // Starts from 1, since 0 is thr PtrOperand
+        for (unsigned int i = 1; i < DefiningInstruction->getNumOperands(); i++) { // Starts from 1, since 0 is thr PtrOperand
 	   	    Value* Op = DefiningInstruction->getOperand(i);
 	   		  if (! isa<Constant>(Op)) {
 	   		    RetrieveDataFlow(Op, Flows);
@@ -256,7 +256,7 @@ public:
     LLVMContext &C = M.getContext();
     IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
     IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
-    IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
+    //IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
     ConstantInt *Zero = ConstantInt::get(Int8Ty, 0);
     ConstantInt *One = ConstantInt::get(Int8Ty, 1);
     unsigned int instrumentedLocations = 0;
@@ -409,7 +409,7 @@ public:
 					// We propagate the dependency info
 					Value* Result = static_cast<Value*>(&I);
           if (Result and ! isa<CallInst>(I)) {              // We exclude CallInst, as they're managed separately (Not excluding them now, would introduce a double dependency leading to the same value)
-						for (int i = 0; i < I.getNumOperands(); i++) {
+						for (unsigned int i = 0; i < I.getNumOperands(); i++) {
 							Value* Op = I.getOperand(i);
 							if (! isa<Constant>(Op))
 								InsertDataFlow(Op, Result);
@@ -472,7 +472,7 @@ public:
                   if (Src == ST) // Already managed in the `reachableByStores` method
                     continue; 
                   if (Src->getParent() != ST->getParent()) {
-                    std::tuple<BasicBlock*, BasicBlock*> edge = {Src->getParent(), ST->getParent()};
+                    std::tuple<BasicBlock*, BasicBlock*> edge = decltype(edge){Src->getParent(), ST->getParent()};
                     StoreEdges.push_back(edge);
                     IncomingEdges[ST->getParent()].insert(Src->getParent());
                     DEBUG(errs() << "+++++++++++\nAdding edge\n");
@@ -542,7 +542,7 @@ public:
                 }
               }
             }
-						for (int i = argStart; i < Call->getNumArgOperands(); i++) {
+						for (unsigned int i = argStart; i < Call->getNumArgOperands(); i++) {
               Value* ArgOp = Call->getArgOperand(i);
 							if (! isa<Constant>(ArgOp)) {
 								std::vector<Value*> Flows;
@@ -561,7 +561,7 @@ public:
                       if (Src == Call) // Already managed in the `reachableByStores` method
                         continue; 
                       if (Src->getParent() != Call->getParent()) {
-                        std::tuple<BasicBlock*, BasicBlock*> edge = {Src->getParent(), Call->getParent()};
+                        std::tuple<BasicBlock*, BasicBlock*> edge = decltype(edge){Src->getParent(), Call->getParent()};
                         StoreEdges.push_back(edge);
                         IncomingEdges[Call->getParent()].insert(Src->getParent());
                         DEBUG(errs() << "+++++++++++\nAdding edge\n");
