@@ -54,6 +54,18 @@ void debug_instruction(Instruction* I) {
 //  }
 //}
 
+// Checks if Src is in the predecessor BB of To
+bool isPredecessorBB(Instruction* Src, Instruction *To) {
+  BasicBlock* ToParent = To->getParent();
+  BasicBlock* SrcParent = Src->getParent();
+  for (auto it = pred_begin(ToParent); it != pred_end(ToParent); ++it) {
+    BasicBlock* predecessor = *it;
+    if (predecessor == SrcParent) 
+      return true;
+  }
+  return false;
+}
+
 
 bool* isReachableByStore(std::vector<FlowWriteInstruction*>* From, Instruction* To, DominatorTree* DT, LoopInfo* LI, unsigned* ConsideredStores) {
 

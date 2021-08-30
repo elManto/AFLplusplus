@@ -29,6 +29,7 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/GlobalValue.h"
@@ -68,6 +69,9 @@
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+
+//#include "WPA/WPAPass.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -117,6 +121,7 @@
 #endif
 
 using namespace llvm;
+//using namespace svf;
 
 class DDGInstrModulePass : public ModulePass {
 
@@ -239,6 +244,7 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<DominatorTreeWrapperPass>();
+    AU.addRequired<PostDominatorTreeWrapperPass>();
   }
 
   StringRef getPassName() const override {
@@ -332,6 +338,7 @@ public:
 
       LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(F).getLoopInfo();
       DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
+      PostDominatorTree &PT = getAnalysis<PostDominatorTreeWrapperPass>(F).getPostDomTree();
   
 			// We basically want to track data flow between memory instructions 
 			// and call instructions (i.e., the arguments)
@@ -380,7 +387,6 @@ public:
                   if (Src == LOI) // Already managed in the `reachableByStores` method
                     continue; 
                   if (Src->getParent() != LOI->getParent()) {
-                    std::tuple<BasicBlock*, BasicBlock*> edge = {Src->getParent(), LOI->getParent()};
                     StoreEdges.push_back(edge);
                     IncomingEdges[LOI->getParent()].insert(LOI->getParent());
                     DEBUG(errs() << "+++++++++++\nAdding edge\n");
@@ -471,6 +477,10 @@ public:
                   Instruction* Src = (*it)->I;
                   if (Src == ST) // Already managed in the `reachableByStores` method
                     continue; 
+                  if (isPredecessorBB(Src, ST)) // Already managed by edge coverage
+                    continue;
+                  if (PT.dominates(Src, ST))
+                    continue;
                   if (Src->getParent() != ST->getParent()) {
                     std::tuple<BasicBlock*, BasicBlock*> edge = decltype(edge){Src->getParent(), ST->getParent()};
                     StoreEdges.push_back(edge);
@@ -560,6 +570,10 @@ public:
                     Instruction* Src = (*it)->I;
                       if (Src == Call) // Already managed in the `reachableByStores` method
                         continue; 
+                      if (isPredecessorBB(Src, Call))
+                        continue;
+                      if (PT.dominates(Src, Call))
+                        continue;
                       if (Src->getParent() != Call->getParent()) {
                         std::tuple<BasicBlock*, BasicBlock*> edge = decltype(edge){Src->getParent(), Call->getParent()};
                         StoreEdges.push_back(edge);
@@ -625,7 +639,8 @@ public:
         StoreIsVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
         Value* HashedLoc = nullptr;
-
+        if (IncomingEdges[&BB].size() <= 1)
+          continue;
         for (std::set<BasicBlock*>::iterator it = IncomingEdges[&BB].begin(); it != IncomingEdges[&BB].end(); ++it) {
           Value* isVisited = VisitedBlocks[*it];
           ConstantInt* PotentiallyPreviousLoc = BlocksLocs[*it];
@@ -670,7 +685,7 @@ public:
 
 		}			
 	
-  //errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
+  errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
 	return true;
   }
   

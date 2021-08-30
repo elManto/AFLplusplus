@@ -116,4 +116,4 @@ void debug_instruction(Instruction* I);
 //Other util methods
 
 bool* isReachableByStore(std::vector<FlowWriteInstruction*>* From, Instruction* To, DominatorTree* DT, LoopInfo* LI, unsigned* ConsideredStores);
-
+bool isPredecessorBB(Instruction* Src, Instruction *To);

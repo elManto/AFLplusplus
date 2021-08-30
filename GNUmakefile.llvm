@@ -381,6 +381,8 @@ ifeq "$(LLVM_LTO)" "1"
 endif
 endif
 
+
+
 instrumentation/afl-llvm-common.o: instrumentation/afl-llvm-common.cc instrumentation/afl-llvm-common.h
 	$(CXX) $(CFLAGS) $(CPPFLAGS) `$(LLVM_CONFIG) --cxxflags` -fno-rtti -fPIC -std=$(LLVM_STDCXX) -c $< -o $@ 
 
