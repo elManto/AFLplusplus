@@ -639,8 +639,8 @@ public:
         StoreIsVisited->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
         Value* HashedLoc = nullptr;
-        //if (IncomingEdges[&BB].size() <= 1)
-        //  continue;
+        if (IncomingEdges[&BB].size() <= 1)
+          continue;
         for (std::set<BasicBlock*>::iterator it = IncomingEdges[&BB].begin(); it != IncomingEdges[&BB].end(); ++it) {
           Value* isVisited = VisitedBlocks[*it];
           ConstantInt* PotentiallyPreviousLoc = BlocksLocs[*it];
@@ -685,7 +685,7 @@ public:
 
 		}			
 	
-  //errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
+  errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
 	return true;
   }
   
