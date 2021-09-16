@@ -274,6 +274,8 @@ public:
     ConstantInt* CurLoc;
     char* name = nullptr;
     unsigned BBCounter = 0;
+
+    unsigned bb_count = 0;
     unsigned int cur_loc = 0;
     uint32_t map_size = MAP_SIZE;
 
@@ -604,6 +606,7 @@ public:
       Value* IsCurrentBlockVisited;
 
       for (auto &BB : F) {
+	bb_count++;
         name = new char[VAR_NAME_LEN];
         memset(name, 0, VAR_NAME_LEN);
         snprintf(name, VAR_NAME_LEN, "my_var_%d", BBCounter++);
@@ -685,7 +688,7 @@ public:
 
 		}			
 	
-  errs() << "DDG - Instrumented " << instrumentedLocations << " locations\n";
+  errs() << "DDG - Instrumented " << instrumentedLocations << " locations over a total of " << bb_count << "\n";
 	return true;
   }
   

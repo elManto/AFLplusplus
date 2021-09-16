@@ -966,6 +966,7 @@ bool AFLCoverage::runOnModule(Module &M) {
       OKF("Instrumented %d locations (%s mode, ratio %u%%).", inst_blocks,
           modeline, inst_ratio);
 
+
     }
 
   }
