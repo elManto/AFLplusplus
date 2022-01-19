@@ -481,7 +481,13 @@ public:
                     continue; 
                   if (isPredecessorBB(Src, ST)) // Already managed by edge coverage
                     continue;
+#if LLVM_VERSION_MAJOR == 9
+		  BasicBlock* SrcParent = Src->getParent();
+		  BasicBlock* STParent = ST->getParent();
+                  if (PT.dominates(SrcParent, STParent))
+#else
                   if (PT.dominates(Src, ST))
+#endif
                     continue;
                   if (Src->getParent() != ST->getParent()) {
                     std::tuple<BasicBlock*, BasicBlock*> edge = decltype(edge){Src->getParent(), ST->getParent()};
@@ -574,7 +580,13 @@ public:
                         continue; 
                       if (isPredecessorBB(Src, Call))
                         continue;
-                      if (PT.dominates(Src, Call))
+#if LLVM_VERSION_MAJOR == 9
+		    							BasicBlock* SrcParent = Src->getParent();
+		  								BasicBlock* STParent = ST->getParent();
+                  		if (PT.dominates(SrcParent, STParent))
+#else
+                  		if (PT.dominates(Src, ST))
+#endif
                         continue;
                       if (Src->getParent() != Call->getParent()) {
                         std::tuple<BasicBlock*, BasicBlock*> edge = decltype(edge){Src->getParent(), Call->getParent()};
