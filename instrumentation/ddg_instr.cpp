@@ -582,10 +582,10 @@ public:
                         continue;
 #if LLVM_VERSION_MAJOR == 9
 		    							BasicBlock* SrcParent = Src->getParent();
-		  								BasicBlock* STParent = ST->getParent();
-                  		if (PT.dominates(SrcParent, STParent))
+		  								BasicBlock* CallParent = Call->getParent();
+                  		if (PT.dominates(SrcParent, CallParent))
 #else
-                  		if (PT.dominates(Src, ST))
+                  		if (PT.dominates(Src, Call))
 #endif
                         continue;
                       if (Src->getParent() != Call->getParent()) {
