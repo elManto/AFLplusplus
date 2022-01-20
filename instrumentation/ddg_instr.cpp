@@ -700,7 +700,7 @@ public:
 
 		}			
 	
-  errs() << "DDG - Instrumented " << instrumentedLocations << " locations over a total of " << bb_count << "\n";
+  errs() << "DDG - Instrumented " << instrumentedLocations << " locations over a total of " << bb_count << " \t\n";
 	return true;
   }
   
